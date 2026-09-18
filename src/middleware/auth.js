@@ -23,6 +23,7 @@ function requireLogin(req, res, next) {
     req.user = decoded; // attach user info to the request for later use
     next(); // let the request continue to the actual route
   } catch (err) {
+    console.error('Token verification failed:', err);
     return res.status(401).json({ error: 'Your session is invalid or expired. Please log in again.' });
   }
 }
@@ -30,6 +31,7 @@ function requireLogin(req, res, next) {
 // Use this AFTER requireLogin on routes that only admins should access.
 function requireAdmin(req, res, next) {
   if (!req.user || !req.user.isAdmin) {
+    console.log('Admin access denied:', req.user?.userId || 'anonymous');
     return res.status(403).json({ error: 'Admins only.' });
   }
   next();

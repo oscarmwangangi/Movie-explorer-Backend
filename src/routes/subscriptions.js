@@ -18,6 +18,7 @@ const router = express.Router();
 // "approval link" - a URL the user opens to approve the payment.
 router.post('/start', requireLogin, async (req, res) => {
   const { planType } = req.body;
+  console.log(`Subscription start requested by user ${req.user.userId}:`, planType);
 
   const planId =
     planType === 'monthly'
@@ -53,9 +54,10 @@ router.post('/start', requireLogin, async (req, res) => {
     // user needs to open to complete payment.
     const approveLink = subscription.links.find((link) => link.rel === 'approve');
 
+    console.log(`Subscription approval link created for user ${req.user.userId}`);
     res.json({ approveUrl: approveLink.href });
   } catch (err) {
-    console.error(err.response?.data || err.message);
+    console.error('Failed to start subscription:', err.response?.data || err);
     res.status(500).json({ error: 'Could not start the subscription with PayPal.' });
   }
 });
@@ -63,26 +65,31 @@ router.post('/start', requireLogin, async (req, res) => {
 // GET /api/subscriptions/me
 // The Flutter app calls this to check "is this user allowed in?"
 router.get('/me', requireLogin, async (req, res) => {
-  const result = await pool.query(
-    'SELECT plan_type, status, expires_at FROM subscriptions WHERE user_id = $1',
-    [req.user.userId]
-  );
-  const sub = result.rows[0];
+  try {
+    const result = await pool.query(
+      'SELECT plan_type, status, expires_at FROM subscriptions WHERE user_id = $1',
+      [req.user.userId]
+    );
+    const sub = result.rows[0];
 
-  if (!sub) {
-    return res.json({ status: 'none' });
+    if (!sub) {
+      console.log(`No subscription found for user ${req.user.userId}`);
+      return res.json({ status: 'none' });
+    }
+
+    const isExpiredByDate = sub.expires_at && new Date(sub.expires_at) < new Date();
+    const status = sub.status === 'active' && isExpiredByDate ? 'expired' : sub.status;
+
+    console.log(`Subscription status for user ${req.user.userId}: ${status}`);
+    res.json({
+      planType: sub.plan_type,
+      status,
+      expiresAt: sub.expires_at,
+    });
+  } catch (err) {
+    console.error(`Failed to load subscription for user ${req.user.userId}:`, err);
+    res.status(500).json({ error: 'Failed to fetch subscription status.' });
   }
-
-  // If the expiry date has passed but we haven't updated the status
-  // yet (e.g. PayPal's webhook hasn't fired), treat it as expired.
-  const isExpiredByDate = sub.expires_at && new Date(sub.expires_at) < new Date();
-  const status = sub.status === 'active' && isExpiredByDate ? 'expired' : sub.status;
-
-  res.json({
-    planType: sub.plan_type,
-    status,
-    expiresAt: sub.expires_at,
-  });
 });
 
 // POST /api/subscriptions/webhook

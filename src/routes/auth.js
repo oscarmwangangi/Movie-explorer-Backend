@@ -22,6 +22,7 @@ function makeToken(user) {
 // Body: { "email": "...", "password": "..." }
 router.post('/register', async (req, res) => {
   const { email, password } = req.body;
+  console.log('Register request received');
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
@@ -54,9 +55,10 @@ router.post('/register', async (req, res) => {
     );
 
     const token = makeToken(user);
+    console.log('Registration completed for user:', user.id);
     res.status(201).json({ token, user: { id: user.id, email: user.email } });
   } catch (err) {
-    console.error(err);
+    console.error('Registration failed:', err);
     res.status(500).json({ error: 'Something went wrong creating your account.' });
   }
 });
@@ -65,6 +67,7 @@ router.post('/register', async (req, res) => {
 // Body: { "email": "...", "password": "..." }
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
+  console.log('Login request received');
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
@@ -87,9 +90,10 @@ router.post('/login', async (req, res) => {
     await pool.query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
 
     const token = makeToken(user);
+    console.log('Login completed for user:', user.id);
     res.json({ token, user: { id: user.id, email: user.email, isAdmin: user.is_admin } });
   } catch (err) {
-    console.error(err);
+    console.error('Login failed:', err);
     res.status(500).json({ error: 'Something went wrong logging in.' });
   }
 });
@@ -138,6 +142,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 // POST /api/auth/change-password
 router.post('/change-password', authenticateToken, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
+  console.log('Password change request received for user:', req.user.userId);
   try {
     // Use userId to match your makeToken function
     const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.userId]);
@@ -151,7 +156,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
       res.status(400).json({ error: 'Current password incorrect.' });
     }
   } catch (err) {
-    console.error(err);
+    console.error('Password change failed:', err);
     res.status(500).json({ error: 'Server error.' });
   }
 });
