@@ -26,29 +26,35 @@ function calculateExpiryDate(planType) {
 // and if PayPal confirms it's ACTIVE, updates our database to match.
 // Returns the new status ('active' or whatever PayPal reports).
 async function activateSubscriptionIfPaid(paypalSubId) {
-  // Ask PayPal itself, rather than trusting the frontend blindly -
-  // this stops someone from faking a "success" return URL.
-  const subscription = await paypal.get(`/v1/billing/subscriptions/${paypalSubId}`);
+  try {
+    console.log(`Checking PayPal subscription ${paypalSubId}`);
+    const subscription = await paypal.get(`/v1/billing/subscriptions/${paypalSubId}`);
 
-  if (subscription.status !== 'ACTIVE') {
-    return subscription.status; // e.g. 'APPROVAL_PENDING' - not paid yet
+    if (subscription.status !== 'ACTIVE') {
+      console.log(`PayPal subscription ${paypalSubId} status: ${subscription.status}`);
+      return subscription.status;
+    }
+
+    const result = await pool.query(
+      'SELECT plan_type FROM subscriptions WHERE paypal_subscription_id = $1',
+      [paypalSubId]
+    );
+    const planType = result.rows[0]?.plan_type || 'monthly';
+    const expiresAt = calculateExpiryDate(planType);
+
+    await pool.query(
+      `UPDATE subscriptions
+       SET status = 'active', started_at = NOW(), expires_at = $1, updated_at = NOW()
+       WHERE paypal_subscription_id = $2`,
+      [expiresAt, paypalSubId]
+    );
+
+    console.log(`Subscription ${paypalSubId} activated`);
+    return 'active';
+  } catch (err) {
+    console.error(`Failed to activate subscription ${paypalSubId}:`, err.response?.data || err);
+    throw err;
   }
-
-  const result = await pool.query(
-    'SELECT plan_type FROM subscriptions WHERE paypal_subscription_id = $1',
-    [paypalSubId]
-  );
-  const planType = result.rows[0]?.plan_type || 'monthly';
-  const expiresAt = calculateExpiryDate(planType);
-
-  await pool.query(
-    `UPDATE subscriptions
-     SET status = 'active', started_at = NOW(), expires_at = $1, updated_at = NOW()
-     WHERE paypal_subscription_id = $2`,
-    [expiresAt, paypalSubId]
-  );
-
-  return 'active';
 }
 
 module.exports = { calculateExpiryDate, activateSubscriptionIfPaid };

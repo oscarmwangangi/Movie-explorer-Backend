@@ -15,35 +15,49 @@ const BASE_URL =
 // endpoint. Tokens expire, so we ask for a fresh one each time we
 // need it (simplest approach - fine for this app's traffic level).
 async function getAccessToken() {
-  const response = await axios.post(
-    `${BASE_URL}/v1/oauth2/token`,
-    'grant_type=client_credentials',
-    {
-      auth: {
-        username: process.env.PAYPAL_CLIENT_ID,
-        password: process.env.PAYPAL_CLIENT_SECRET,
-      },
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    }
-  );
-  return response.data.access_token;
+  try {
+    console.log('Requesting PayPal access token');
+    const response = await axios.post(
+      `${BASE_URL}/v1/oauth2/token`,
+      'grant_type=client_credentials',
+      {
+        auth: {
+          username: process.env.PAYPAL_CLIENT_ID,
+          password: process.env.PAYPAL_CLIENT_SECRET,
+        },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      }
+    );
+    console.log('PayPal access token received');
+    return response.data.access_token;
+  } catch (err) {
+    console.error('PayPal access token request failed:', err.response?.data || err.message);
+    throw err;
+  }
 }
 
 // A tiny wrapper so every other file can just do:
 //   const paypal = require('./paypalClient');
 //   await paypal.post('/v1/billing/subscriptions', {...});
 async function request(method, url, data) {
-  const token = await getAccessToken();
-  const response = await axios({
-    method,
-    url: `${BASE_URL}${url}`,
-    data,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  return response.data;
+  try {
+    console.log(`PayPal request: ${method.toUpperCase()} ${url}`);
+    const token = await getAccessToken();
+    const response = await axios({
+      method,
+      url: `${BASE_URL}${url}`,
+      data,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    console.log(`PayPal response: ${method.toUpperCase()} ${url} ${response.status}`);
+    return response.data;
+  } catch (err) {
+    console.error(`PayPal request failed: ${method.toUpperCase()} ${url}:`, err.response?.data || err.message);
+    throw err;
+  }
 }
 
 module.exports = {
