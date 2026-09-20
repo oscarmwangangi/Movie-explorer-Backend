@@ -3,6 +3,7 @@
 // it continue (by calling next()).
 
 const jwt = require('jsonwebtoken');
+<<<<<<< HEAD
 const pool = require('../db/pool');
 require('dotenv').config();
 
@@ -11,6 +12,13 @@ require('dotenv').config();
 // (tokens last 30 days, so a disable needs to take effect immediately,
 // not just on next login).
 async function requireLogin(req, res, next) {
+=======
+require('dotenv').config();
+
+// Checks that the request has a valid login token.
+// The token is sent in the header like: Authorization: Bearer <token>
+function requireLogin(req, res, next) {
+>>>>>>> baf00aa8ea5f240b5de0f9efb90471845f9aaa10
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -23,6 +31,7 @@ async function requireLogin(req, res, next) {
     // This checks the token is real and not expired.
     // If valid, it gives us back the data we stored in it (userId, isAdmin).
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+<<<<<<< HEAD
 
     const result = await pool.query('SELECT is_disabled FROM users WHERE id = $1', [decoded.userId]);
     if (result.rows.length === 0) {
@@ -32,6 +41,8 @@ async function requireLogin(req, res, next) {
       return res.status(403).json({ error: 'This account has been disabled. Contact support.' });
     }
 
+=======
+>>>>>>> baf00aa8ea5f240b5de0f9efb90471845f9aaa10
     req.user = decoded; // attach user info to the request for later use
     next(); // let the request continue to the actual route
   } catch (err) {
